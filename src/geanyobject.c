@@ -105,6 +105,13 @@ static void create_signals(GObjectClass *g_object_class)
 		0, NULL, NULL, g_cclosure_marshal_VOID__BOXED,
 		G_TYPE_NONE, 1,
 		GEANY_TYPE_DOCUMENT);
+	geany_object_signals[GCB_DOCUMENT_BEFORE_SAVE_AS] = g_signal_new (
+		"document-before-save-as",
+		G_OBJECT_CLASS_TYPE (g_object_class),
+		G_SIGNAL_RUN_FIRST,
+		0, NULL, NULL, g_cclosure_marshal_VOID__BOXED,
+		G_TYPE_NONE, 1,
+		GEANY_TYPE_DOCUMENT);
 	geany_object_signals[GCB_DOCUMENT_SAVE] = g_signal_new (
 		"document-save",
 		G_OBJECT_CLASS_TYPE (g_object_class),
@@ -202,6 +209,12 @@ static void create_signals(GObjectClass *g_object_class)
 	/* General signals */
 	geany_object_signals[GCB_GEANY_STARTUP_COMPLETE] = g_signal_new (
 		"geany-startup-complete",
+		G_OBJECT_CLASS_TYPE (g_object_class),
+		G_SIGNAL_RUN_FIRST,
+		0, NULL, NULL, g_cclosure_marshal_VOID__VOID,
+		G_TYPE_NONE, 0);
+	geany_object_signals[GCB_GEANY_BEFORE_QUIT] = g_signal_new (
+		"geany-before-quit",
 		G_OBJECT_CLASS_TYPE (g_object_class),
 		G_SIGNAL_RUN_FIRST,
 		0, NULL, NULL, g_cclosure_marshal_VOID__VOID,

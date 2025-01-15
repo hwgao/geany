@@ -32,10 +32,13 @@
 #include "subparser.h"
 #include "vstring.h"
 
+#define TOML_QUOTED_KEY_CHAR(c) ( (c) == '"' || (c) == '\'' )
+
 static bool isIdentifier (int c)
 {
-    /* allow whitespace within keys and sections */
-    return (bool)(isalnum (c) || isspace (c) ||  c == '_');
+	/* allow whitespace within keys and sections */
+	return (bool)(isalnum (c) || isspace (c) || c == '_' || c == '-' || c == '.'
+		|| TOML_QUOTED_KEY_CHAR(c));
 }
 
 static bool isValue (int c)
@@ -96,9 +99,7 @@ static void makeIniconfTagMaybe (const char *section, const char *key, const cha
 	}
 	else
 	{
-		tagEntryInfo *last = getEntryInCorkQueue (*index);
-		if (last)
-			last->extensionFields.endLine = getInputLineNumber ();
+		setTagEndLineToCorkEntry (*index, getInputLineNumber ());
 
 		initTagEntry (&e, section, K_SECTION);
 		*index = makeTagEntry (&e);
@@ -124,7 +125,7 @@ static void findIniconfTags (void)
 		const unsigned char* cp = line;
 		bool possible = true;
 
-		if (isspace ((int) *cp) || *cp == '#' || *cp == ';' || *cp == '\0'
+		if (isspace (*cp) || *cp == '#' || *cp == ';' || *cp == '\0'
 		    || (*cp == '/' && *(cp+1) == '/'))
 			continue;
 
@@ -132,9 +133,10 @@ static void findIniconfTags (void)
 		if (*cp == '[')
 		{
 			++cp;
-			while (*cp != '\0' && *cp != ']')
+			/* look for the final ] to support TOML [[arrays.of.tables]] */
+			while (*cp != '\0' && (*cp != ']' || *(cp+1) == ']'))
 			{
-				vStringPut (name, (int) *cp);
+				vStringPut (name, *cp);
 				++cp;
 			}
 
@@ -160,25 +162,25 @@ static void findIniconfTags (void)
 		while (*cp != '\0')
 		{
 			/*  We look for any sequence of identifier characters following a white space */
-			if (possible && isIdentifier ((int) *cp))
+			if (possible && isIdentifier (*cp))
 			{
-				while (isIdentifier ((int) *cp))
+				while (isIdentifier (*cp))
 				{
-					vStringPut (name, (int) *cp);
+					vStringPut (name, *cp);
 					++cp;
 				}
 				vStringStripTrailing (name);
-				while (isspace ((int) *cp))
+				while (isspace (*cp))
 					++cp;
 				if (*cp == '=' || *cp == ':')
 				{
 
 					cp++;
-					while (isspace ((int) *cp))
+					while (isspace (*cp))
 						++cp;
-					while (isValue ((int) *cp))
+					while (isValue (*cp))
 					{
-						vStringPut (val, (int) *cp);
+						vStringPut (val, *cp);
 						++cp;
 					}
 					vStringStripTrailing (val);
@@ -211,7 +213,7 @@ static void findIniconfTags (void)
 				vStringClear (name);
 			}
 			else
-				possible = !!(isspace ((int) *cp));
+				possible = !!(isspace (*cp));
 
 			if (*cp != '\0')
 				++cp;

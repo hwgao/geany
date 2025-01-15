@@ -1,5 +1,5 @@
 project('geany', 'c', 'cpp',
-        meson_version: '>= 0.53',
+        meson_version: '>= 0.56',
         version: '2.1',
         default_options : ['c_std=c11', 'cpp_std=c++17'])
 
@@ -118,7 +118,7 @@ cdata.set_quoted('PACKAGE_NAME','Geany')
 cdata.set_quoted('PACKAGE_STRING', 'Geany ' + meson.project_version())
 cdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 cdata.set('GETTEXT_PACKAGE', 'PACKAGE')
-cdata.set('VERSION', meson.project_version())
+cdata.set_quoted('VERSION', meson.project_version())
 cdata.set('ENABLE_NLS', 1)
 if (host_machine.system() != 'windows' and get_option('vte'))
 	cdata.set('HAVE_VTE', 1)
@@ -168,7 +168,7 @@ cdata.set_quoted('REVISION', revision)
 
 python_command = get_option('python-command')
 if python_command == '' or python_command == 'auto'
-	if target_machine.system() == 'windows'
+	if host_machine.system() == 'windows'
 		python_command = 'py'
 	else
 		python_command = 'python'
@@ -213,7 +213,7 @@ endforeach
 geany_cflags = def_cflags
 have_gcc4_visibility = cc.has_argument('-fvisibility=hidden')
 geany_cflags += '-DGEANY_PRIVATE'
-if target_machine.system() == 'windows'
+if host_machine.system() == 'windows'
 	geany_cflags += '-DGEANY_EXPORT_SYMBOL=__declspec(dllexport)'
 elif have_gcc4_visibility
 	geany_cflags += '-fvisibility=hidden'
@@ -251,12 +251,14 @@ lexilla = static_library('lexilla',
 	'scintilla/lexilla/lexers/LexBasic.cxx',
 	'scintilla/lexilla/lexers/LexBatch.cxx',
 	'scintilla/lexilla/lexers/LexCaml.cxx',
+	'scintilla/lexilla/lexers/LexCIL.cxx',
 	'scintilla/lexilla/lexers/LexCmake.cxx',
 	'scintilla/lexilla/lexers/LexCOBOL.cxx',
 	'scintilla/lexilla/lexers/LexCoffeeScript.cxx',
 	'scintilla/lexilla/lexers/LexCPP.cxx',
 	'scintilla/lexilla/lexers/LexCSS.cxx',
 	'scintilla/lexilla/lexers/LexD.cxx',
+	'scintilla/lexilla/lexers/LexDart.cxx',
 	'scintilla/lexilla/lexers/LexDiff.cxx',
 	'scintilla/lexilla/lexers/LexErlang.cxx',
 	'scintilla/lexilla/lexers/LexForth.cxx',
@@ -271,6 +273,8 @@ lexilla = static_library('lexilla',
 	'scintilla/lexilla/lexers/LexMake.cxx',
 	'scintilla/lexilla/lexers/LexMarkdown.cxx',
 	'scintilla/lexilla/lexers/LexMatlab.cxx',
+	'scintilla/lexilla/lexers/LexNim.cxx',
+	'scintilla/lexilla/lexers/LexNix.cxx',
 	'scintilla/lexilla/lexers/LexNsis.cxx',
 	'scintilla/lexilla/lexers/LexNull.cxx',
 	'scintilla/lexilla/lexers/LexPascal.cxx',
@@ -280,15 +284,19 @@ lexilla = static_library('lexilla',
 	'scintilla/lexilla/lexers/LexProps.cxx',
 	'scintilla/lexilla/lexers/LexPython.cxx',
 	'scintilla/lexilla/lexers/LexR.cxx',
+	'scintilla/lexilla/lexers/LexRaku.cxx',
 	'scintilla/lexilla/lexers/LexRuby.cxx',
 	'scintilla/lexilla/lexers/LexRust.cxx',
 	'scintilla/lexilla/lexers/LexSmalltalk.cxx',
 	'scintilla/lexilla/lexers/LexSQL.cxx',
 	'scintilla/lexilla/lexers/LexTCL.cxx',
+	'scintilla/lexilla/lexers/LexTOML.cxx',
 	'scintilla/lexilla/lexers/LexTxt2tags.cxx',
 	'scintilla/lexilla/lexers/LexVerilog.cxx',
 	'scintilla/lexilla/lexers/LexVHDL.cxx',
+	'scintilla/lexilla/lexers/LexVisualProlog.cxx',
 	'scintilla/lexilla/lexers/LexYAML.cxx',
+	'scintilla/lexilla/lexers/LexZig.cxx',
 	'scintilla/lexilla/lexlib/Accessor.cxx',
 	'scintilla/lexilla/lexlib/Accessor.h',
 	'scintilla/lexilla/lexlib/CatalogueModules.h',
@@ -298,6 +306,8 @@ lexilla = static_library('lexilla',
 	'scintilla/lexilla/lexlib/CharacterSet.h',
 	'scintilla/lexilla/lexlib/DefaultLexer.cxx',
 	'scintilla/lexilla/lexlib/DefaultLexer.h',
+	'scintilla/lexilla/lexlib/InList.cxx',
+	'scintilla/lexilla/lexlib/InList.h',
 	'scintilla/lexilla/lexlib/LexAccessor.cxx',
 	'scintilla/lexilla/lexlib/LexAccessor.h',
 	'scintilla/lexilla/lexlib/LexerBase.cxx',
@@ -414,6 +424,8 @@ scintilla = static_library('scintilla',
 	'scintilla/src/SplitVector.h',
 	'scintilla/src/Style.cxx',
 	'scintilla/src/Style.h',
+	'scintilla/src/UndoHistory.cxx',
+	'scintilla/src/UndoHistory.h',
 	'scintilla/src/UniConversion.cxx',
 	'scintilla/src/UniConversion.h',
 	'scintilla/src/UniqueString.cxx',
@@ -499,6 +511,7 @@ ctags = static_library('ctags',
 	'ctags/main/htable.h',
 	'ctags/main/inline.h',
 	'ctags/main/interactive_p.h',
+	'ctags/main/interval_tree_generic.h',
 	'ctags/main/keyword.c',
 	'ctags/main/keyword.h',
 	'ctags/main/keyword_p.h',
@@ -546,6 +559,7 @@ ctags = static_library('ctags',
 	'ctags/main/ptrarray.h',
 	'ctags/main/rbtree.c',
 	'ctags/main/rbtree.h',
+	'ctags/main/rbtree_augmented.h',
 	'ctags/main/read.c',
 	'ctags/main/read.h',
 	'ctags/main/read_p.h',
@@ -577,6 +591,8 @@ ctags = static_library('ctags',
 	'ctags/main/types.h',
 	'ctags/main/unwindi.c',
 	'ctags/main/unwindi.h',
+	'ctags/main/utf8_str.c',
+	'ctags/main/utf8_str.h',
 	'ctags/main/vstring.c',
 	'ctags/main/vstring.h',
 	'ctags/main/writer.c',
@@ -588,6 +604,9 @@ ctags = static_library('ctags',
 	'ctags/main/xtag.c',
 	'ctags/main/xtag.h',
 	'ctags/main/xtag_p.h',
+	'ctags/optlib/forth.c',
+	'ctags/optlib/meson.c',
+	'ctags/optlib/scss.c',
 	'ctags/parsers/abaqus.c',
 	'ctags/parsers/abc.c',
 	'ctags/parsers/ada.c',
@@ -596,6 +615,7 @@ ctags = static_library('ctags',
 	'ctags/parsers/autoit.c',
 	'ctags/parsers/basic.c',
 	'ctags/parsers/bibtex.c',
+	'ctags/parsers/bibtex.h',
 	'ctags/parsers/clojure.c',
 	'ctags/parsers/cobol.c',
 	'ctags/parsers/cpreprocessor.c',
@@ -613,6 +633,7 @@ ctags = static_library('ctags',
 	'ctags/parsers/cxx/cxx_parser.h',
 	'ctags/parsers/cxx/cxx_parser_internal.h',
 	'ctags/parsers/cxx/cxx_parser_lambda.c',
+	'ctags/parsers/cxx/cxx_parser_module.c',
 	'ctags/parsers/cxx/cxx_parser_namespace.c',
 	'ctags/parsers/cxx/cxx_parser_template.c',
 	'ctags/parsers/cxx/cxx_parser_tokenizer.c',
@@ -622,6 +643,8 @@ ctags = static_library('ctags',
 	'ctags/parsers/cxx/cxx_qtmoc.c',
 	'ctags/parsers/cxx/cxx_scope.c',
 	'ctags/parsers/cxx/cxx_scope.h',
+	'ctags/parsers/cxx/cxx_side_chain.c',
+	'ctags/parsers/cxx/cxx_side_chain.h',
 	'ctags/parsers/cxx/cxx_subparser.c',
 	'ctags/parsers/cxx/cxx_subparser.h',
 	'ctags/parsers/cxx/cxx_subparser_internal.h',
@@ -641,7 +664,7 @@ ctags = static_library('ctags',
 	'ctags/parsers/geany_docbook.c',
 	'ctags/parsers/geany_lcpp.c',
 	'ctags/parsers/geany_lcpp.h',
-	'ctags/parsers/geany_matlab.c',
+	'ctags/parsers/matlab.c',
 	'ctags/parsers/go.c',
 	'ctags/parsers/haskell.c',
 	'ctags/parsers/haxe.c',
@@ -649,8 +672,10 @@ ctags = static_library('ctags',
 	'ctags/parsers/iniconf.c',
 	'ctags/parsers/iniconf.h',
 	'ctags/parsers/jscript.c',
+	'ctags/parsers/jscript.h',
 	'ctags/parsers/json.c',
 	'ctags/parsers/julia.c',
+	'ctags/parsers/ldscript.c',
 	'ctags/parsers/lisp.c',
 	'ctags/parsers/lua.c',
 	'ctags/parsers/make.c',
@@ -659,6 +684,7 @@ ctags = static_library('ctags',
 	'ctags/parsers/markdown.h',
 	'ctags/parsers/nsis.c',
 	'ctags/parsers/objc.c',
+	'ctags/parsers/ocaml.c',
 	'ctags/parsers/pascal.c',
 	'ctags/parsers/perl.c',
 	'ctags/parsers/perl.h',
@@ -667,10 +693,13 @@ ctags = static_library('ctags',
 	'ctags/parsers/python.c',
 	'ctags/parsers/r.c',
 	'ctags/parsers/r.h',
+	'ctags/parsers/raku.c',
 	'ctags/parsers/rst.c',
 	'ctags/parsers/ruby.c',
+	'ctags/parsers/ruby.h',
 	'ctags/parsers/rust.c',
 	'ctags/parsers/sh.c',
+	'ctags/parsers/sh.h',
 	'ctags/parsers/sql.c',
 	'ctags/parsers/tcl.c',
 	'ctags/parsers/tcl.h',
@@ -725,7 +754,10 @@ gen_src = custom_target('gen-signallist',
 
 win_src = []
 win_deps = []
+win_resc = []
 if (host_machine.system() == 'windows')
+	windows = import('windows')
+	win_resc = windows.compile_resources('geany_private.rc')
 	win_src += [ 'src/win32.c', 'src/win32.h' ]
 	foreach lib : ['ole32', 'wsock32', 'comdlg32']
 		win_deps += cc.find_library(lib)
@@ -767,6 +799,7 @@ install_headers(
 	'src/msgwindow.h',
 	'src/navqueue.h',
 	'src/plugindata.h',
+	'src/pluginextension.h',
 	'src/pluginutils.h',
 	'src/prefs.h',
 	'src/project.h',
@@ -828,6 +861,8 @@ libgeany = shared_library('geany',
 	'src/navqueue.h',
 	'src/notebook.c',
 	'src/notebook.h',
+	'src/pluginextension.c',
+	'src/pluginextension.h',
 	'src/plugins.c',
 	'src/plugins.h',
 	'src/pluginutils.c',
@@ -879,13 +914,15 @@ dep_libgeany = declare_dependency(
 )
 
 executable('geany',
+	win_resc,
 	'src/main.c',
 	link_with: libgeany,
 	c_args: geany_cflags + [ '-DG_LOG_DOMAIN="Geany"' ],
 	dependencies: deps,
 	build_rpath: meson.build_root(),
 	install_rpath: '$ORIGIN/../' + get_option('libdir'),
-	install: true
+	install: true,
+	win_subsystem: 'windows',
 )
 
 i18n = import('i18n')

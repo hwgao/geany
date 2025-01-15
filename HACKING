@@ -536,8 +536,7 @@ first (scintilla or ctags).
 If you want to reuse an existing lexer and/or tag parser, making a
 custom filetype is probably easier - it doesn't require any
 changes to the source code. Follow instructions in the manual:
-https://geany.org/manual/index.html#custom-filetypes. Don't forget to
-update the ``[Groups]`` section in ``filetype_extensions.conf``.
+https://geany.org/manual/index.html#custom-filetypes.
 
 .. warning::
   You should use the newer `[build-menu]` section for default build
@@ -585,8 +584,9 @@ LexFoo.cxx. Try the official Scintilla project first.
 When adding a lexer:
 
 * add LexFoo.cxx to scintilla/lexilla/lexers
-* add `&lmFoo` to scintilla/lexilla/src/Lexilla.cxx and
-  scintilla/scintilla_changes.patch
+* add ``&lmFoo`` to scintilla/lexilla/src/Lexilla.cxx
+* update scintilla/scintilla_changes.patch to contain ``+ &lmFoo,`` and
+  increment ``s`` in the hunk header ``@@ -R,r +S,s @@`` above the added line
 * update scintilla/Makefile.am and meson.build
 
 For syntax highlighting, you will need to edit highlighting.c and
@@ -648,6 +648,11 @@ indentation after ':' is done from on_new_line_added().
 
 If the Scintilla lexer supports user type keyword highlighting (e.g.
 SCLEX_CPP), update document_highlight_tags() in document.c.
+
+If the filetype is a scripting language and the interpreter can be started
+using a shebang, update find_shebang() in filetypes.c.
+
+Update editor_set_indentation_guides() in editor.c if needed.
 
 Adding a CTags parser
 ^^^^^^^^^^^^^^^^^^^^^
@@ -711,21 +716,23 @@ When you have these two files, you have to list your new test along the
 other ones in the ``test_source`` variable in ``tests/ctags/Makefile.am``
 and ``tests/meson.build``. Please keep this list sorted alphabetically.
 
-Upgrading Scintilla
--------------------
+Upgrading Scintilla and Lexilla
+-------------------------------
 
-To upgrade the local Scintilla copy, use the ``scripts/update-scintilla.sh``
-script.
+To upgrade the local Scintilla and Lexilla copy, use the
+``scripts/update-scintilla.sh`` script.
 
-To use it, you need to first obtain a copy of the Scintilla sources you want
-to update to.  This will generally mean checking out a release tag from the
-Scintilla Mercurial repository, or extracting a tarball.
+To use it, you need to first obtain a copy of the Scintilla and Lexilla sources
+you want to update to.  This will generally mean checking out a release tag
+from the Scintilla Mercurial repository and the Lexilla git repository, or
+extracting a tarball.
 
-Then, just run the script from Geany's to source directory passing the path
-to the Scintilla source directory as first argument, and follow the
+Then, just run the script from Geany's ``scripts`` directory, passing the path
+to the Scintilla source directory as the first argument and the Lexilla
+source directory as the second argument, and follow the
 instructions, if any::
 
-    ./scripts/update-scintilla.sh /path/to/scintilla/
+    ./scripts/update-scintilla.sh /path/to/scintilla/ /path/to/lexilla/
 
 GDB
 ---

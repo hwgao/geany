@@ -44,6 +44,7 @@
 #include "msgwindow.h"
 #include "navqueue.h"
 #include "notebook.h"
+#include "pluginextension.h"
 #include "project.h"
 #include "sciwrappers.h"
 #include "sidebar.h"
@@ -104,7 +105,6 @@ enum
 };
 
 
-static guint show_tab_idle = 0;
 static guint doc_id_counter = 0;
 
 
@@ -352,9 +352,10 @@ GeanyDocument *document_get_from_notebook_child(GtkWidget *page)
 GEANY_API_SYMBOL
 GeanyDocument *document_get_from_page(guint page_num)
 {
+	gint pages = gtk_notebook_get_n_pages(GTK_NOTEBOOK(main_widgets.notebook));
 	GtkWidget *parent;
 
-	if (page_num >= documents_array->len)
+	if (page_num >= pages)
 		return NULL;
 
 	parent = gtk_notebook_get_nth_page(GTK_NOTEBOOK(main_widgets.notebook), page_num);
@@ -859,6 +860,9 @@ GeanyDocument *document_new_file(const gchar *utf8_filename, GeanyFiletype *ft, 
 
 	document_set_filetype(doc, ft); /* also re-parses tags */
 
+	/* now the document is fully ready, display it (see notebook_new_tab()) */
+	gtk_widget_show(document_get_notebook_child(doc));
+
 	ui_set_window_title(doc);
 	build_menu_update(doc);
 	document_set_text_changed(doc, FALSE);
@@ -998,19 +1002,15 @@ static gboolean load_text_file(const gchar *locale_filename, const gchar *displa
 	}
 
 	if (! encodings_convert_to_utf8_auto(&filedata->data, &filedata->len, forced_enc,
-				&filedata->enc, &filedata->bom, &filedata->readonly))
+				&filedata->enc, &filedata->bom, &filedata->readonly, &err))
 	{
 		if (forced_enc)
-		{
-			ui_set_statusbar(TRUE, _("The file \"%s\" is not valid %s."),
-				display_filename, forced_enc);
-		}
+			ui_set_statusbar(TRUE, _("Failed to load file \"%s\" as %s: %s."),
+				display_filename, forced_enc, err->message);
 		else
-		{
-			ui_set_statusbar(TRUE,
-	_("The file \"%s\" does not look like a text file or the file encoding is not supported."),
-			display_filename);
-		}
+			ui_set_statusbar(TRUE, _("Failed to load file \"%s\": %s."),
+				display_filename, err->message);
+		g_error_free(err);
 		g_free(filedata->data);
 		return FALSE;
 	}
@@ -1268,40 +1268,17 @@ void document_apply_indent_settings(GeanyDocument *doc)
 
 void document_show_tab(GeanyDocument *doc)
 {
-	if (show_tab_idle)
-	{
-		g_source_remove(show_tab_idle);
-		show_tab_idle = 0;
-	}
+	if (!doc)
+		return;
 
 	gtk_notebook_set_current_page(GTK_NOTEBOOK(main_widgets.notebook),
 		document_get_notebook_page(doc));
 
 	/* finally, let the editor widget grab the focus so you can start coding
 	 * right away */
-	document_try_focus(doc, NULL);
-}
-
-
-static gboolean show_tab_cb(gpointer data)
-{
-	GeanyDocument *doc = (GeanyDocument *) data;
-
-	show_tab_idle = 0;
-	/* doc might not be valid e.g. if user closed a tab whilst Geany is opening files */
-	if (DOC_VALID(doc))
-		document_show_tab(doc);
-
-	return G_SOURCE_REMOVE;
-}
-
-
-void document_show_tab_idle(GeanyDocument *doc)
-{
-	if (show_tab_idle)
-		g_source_remove(show_tab_idle);
-
-	show_tab_idle = g_idle_add(show_tab_cb, doc);
+	/* FIXME: is that actually useful??  I don't see any difference disabling this code... */
+	if (!main_status.opening_session_files)
+		document_try_focus(doc, NULL);
 }
 
 
@@ -1521,6 +1498,9 @@ GeanyDocument *document_open_file_full(GeanyDocument *doc, const gchar *filename
 				display_filename, gtk_notebook_get_n_pages(GTK_NOTEBOOK(main_widgets.notebook)),
 				(readonly) ? _(", read-only") : "");
 		}
+
+		/* now the document is fully ready, display it (see notebook_new_tab()) */
+		gtk_widget_show(document_get_notebook_child(doc));
 	}
 
 	g_free(display_filename);
@@ -1838,6 +1818,8 @@ gboolean document_save_file_as(GeanyDocument *doc, const gchar *utf8_fname)
 	gboolean new_file;
 
 	g_return_val_if_fail(doc != NULL, FALSE);
+
+	g_signal_emit_by_name(geany_object, "document-before-save-as", doc);
 
 	new_file = document_need_save_as(doc) || (utf8_fname != NULL && strcmp(doc->file_name, utf8_fname) != 0);
 	if (utf8_fname != NULL)
@@ -2334,7 +2316,7 @@ gboolean document_search_bar_find(GeanyDocument *doc, const gchar *text, gboolea
  */
 gint document_find_text(GeanyDocument *doc, const gchar *text, const gchar *original_text,
 		GeanyFindFlags flags, gboolean search_backwards, GeanyMatchInfo **match_,
-		gboolean scroll, GtkWidget *parent)
+		gboolean scroll)
 {
 	gint selection_end, selection_start, search_pos;
 
@@ -2388,13 +2370,12 @@ gint document_find_text(GeanyDocument *doc, const gchar *text, const gchar *orig
 
 		/* we searched only part of the document, so ask whether to wraparound. */
 		if (search_prefs.always_wrap ||
-			dialogs_show_question_full(parent, GTK_STOCK_FIND, GTK_STOCK_CANCEL,
-				_("Wrap search and find again?"), _("\"%s\" was not found."), original_text))
+			search_show_wrap_dialog(original_text))
 		{
 			gint ret;
 
 			sci_set_current_position(doc->editor->sci, (search_backwards) ? sci_len : 0, FALSE);
-			ret = document_find_text(doc, text, original_text, flags, search_backwards, match_, scroll, parent);
+			ret = document_find_text(doc, text, original_text, flags, search_backwards, match_, scroll);
 			if (ret == -1)
 			{	/* return to original cursor position if not found */
 				sci_set_current_position(doc->editor->sci, selection_start, FALSE);
@@ -2435,7 +2416,7 @@ gint document_replace_text(GeanyDocument *doc, const gchar *find_text, const gch
 	if (selection_end == selection_start)
 	{
 		/* no selection so just find the next match */
-		document_find_text(doc, find_text, original_find_text, flags, search_backwards, NULL, TRUE, NULL);
+		document_find_text(doc, find_text, original_find_text, flags, search_backwards, NULL, TRUE);
 		return -1;
 	}
 	/* there's a selection so go to the start before finding to search through it
@@ -2445,7 +2426,7 @@ gint document_replace_text(GeanyDocument *doc, const gchar *find_text, const gch
 	else
 		sci_goto_pos(doc->editor->sci, selection_start, TRUE);
 
-	search_pos = document_find_text(doc, find_text, original_find_text, flags, search_backwards, &match, TRUE, NULL);
+	search_pos = document_find_text(doc, find_text, original_find_text, flags, search_backwards, &match, TRUE);
 	/* return if the original selected text did not match (at the start of the selection) */
 	if (search_pos != selection_start)
 	{
@@ -2722,6 +2703,9 @@ void document_highlight_tags(GeanyDocument *doc)
 	GString *keywords_str;
 	gint keyword_idx;
 
+	if (plugin_extension_symbol_highlight_provided(doc, NULL))
+		return;
+
 	/* some filetypes support type keywords (such as struct names), but not
 	 * necessarily all filetypes for a particular scintilla lexer.  this
 	 * tells us whether the filetype supports keywords, and if so
@@ -2737,6 +2721,7 @@ void document_highlight_tags(GeanyDocument *doc)
 		case GEANY_FILETYPES_VALA:
 		case GEANY_FILETYPES_RUST:
 		case GEANY_FILETYPES_GO:
+		case GEANY_FILETYPES_ZIG:
 		{
 
 			/* index of the keyword set in the Scintilla lexer, for
@@ -3606,19 +3591,23 @@ static void enable_key_intercept(GeanyDocument *doc, GtkWidget *bar)
 }
 
 
-static void monitor_reload_file(GeanyDocument *doc)
+static gboolean monitor_reload_file_idle(gpointer data)
 {
+	GeanyDocument *doc = data;
+
+	if (doc != document_get_current())
+		return G_SOURCE_REMOVE;
+
 	if (! doc->changed && file_prefs.reload_clean_doc_on_file_change)
 	{
 		document_reload_force(doc, doc->encoding);
-		return;
+		return G_SOURCE_REMOVE;
 	}
-
-	gchar *base_name = g_path_get_basename(doc->file_name);
 
 	/* show this message only once */
 	if (doc->priv->info_bars[MSG_TYPE_RELOAD] == NULL)
 	{
+		gchar *base_name = g_path_get_basename(doc->file_name);
 		GtkWidget *bar;
 
 		bar = document_show_message(doc, GTK_MESSAGE_QUESTION, on_monitor_reload_file_response,
@@ -3632,8 +3621,10 @@ static void monitor_reload_file(GeanyDocument *doc)
 		protect_document(doc);
 		doc->priv->info_bars[MSG_TYPE_RELOAD] = bar;
 		enable_key_intercept(doc, bar);
+		g_free(base_name);
 	}
-	g_free(base_name);
+
+	return G_SOURCE_REMOVE;
 }
 
 
@@ -3661,8 +3652,13 @@ static void on_monitor_resave_missing_file_response(GtkWidget *bar,
 }
 
 
-static void monitor_resave_missing_file(GeanyDocument *doc)
+static gboolean monitor_resave_missing_file_idle(gpointer data)
 {
+	GeanyDocument *doc = data;
+
+	if (doc != document_get_current())
+		return G_SOURCE_REMOVE;
+
 	if (doc->priv->info_bars[MSG_TYPE_RESAVE] == NULL)
 	{
 		GtkWidget *bar = doc->priv->info_bars[MSG_TYPE_RELOAD];
@@ -3686,6 +3682,8 @@ static void monitor_resave_missing_file(GeanyDocument *doc)
 		doc->priv->info_bars[MSG_TYPE_RESAVE] = bar;
 		enable_key_intercept(doc, bar);
 	}
+
+	return G_SOURCE_REMOVE;
 }
 
 
@@ -3727,7 +3725,11 @@ gboolean document_check_disk_status(GeanyDocument *doc, gboolean force)
 	locale_filename = utils_get_locale_from_utf8(doc->file_name);
 	if (!get_mtime(locale_filename, &mtime))
 	{
-		monitor_resave_missing_file(doc);
+		/* document_check_disk_status() call may be a result of a mouse click
+		 * inside Scintilla by which Geany gains focus and showing the info bar
+		 * during the mouse click leads to text selection as Scintilla scrolls
+		 * because the infobar makes the Scintilla widget smaller. */
+		g_idle_add(monitor_resave_missing_file_idle, doc);
 		/* doc may be closed now */
 		ret = TRUE;
 	}
@@ -3735,7 +3737,8 @@ gboolean document_check_disk_status(GeanyDocument *doc, gboolean force)
 	{
 		/* make sure the user is not prompted again after he cancelled the "reload file?" message */
 		doc->priv->mtime = mtime;
-		monitor_reload_file(doc);
+		/* see above for the idle call explanation */
+		g_idle_add(monitor_reload_file_idle, doc);
 		/* doc may be closed now */
 		ret = TRUE;
 	}

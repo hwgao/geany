@@ -792,6 +792,8 @@ static void build_spawn_cmd(GeanyDocument *doc, const gchar *cmd, const gchar *d
 	working_dir = utils_get_locale_from_utf8(utf8_working_dir);
 
 	gtk_list_store_clear(msgwindow.store_compiler);
+	// reset width after any long error messages
+	gtk_tree_view_columns_autosize(GTK_TREE_VIEW(msgwindow.tree_compiler));
 	gtk_notebook_set_current_page(GTK_NOTEBOOK(msgwindow.notebook), MSG_COMPILER);
 	msgwin_compiler_add(COLOR_BLUE, _("%s (in directory: %s)"), cmd, utf8_working_dir);
 	g_free(utf8_working_dir);
@@ -1266,17 +1268,24 @@ static void on_build_menu_item(GtkWidget *w, gpointer user_data)
 	if (grp == GEANY_GBG_NON_FT && cmd == GBO_TO_CMD(GEANY_GBO_CUSTOM))
 	{
 		static GtkWidget *dialog = NULL; /* keep dialog for combo history */
+		gchar *str;
 
+		bc = get_build_cmd(doc, grp, cmd, NULL);
+		str = g_strdup_printf(_("Enter custom text to append to the command \"%s\":"),
+			bc->command);
 		if (! dialog)
 		{
-			dialog = dialogs_show_input_persistent(_("Custom Text"), GTK_WINDOW(main_widgets.window),
-				_("Enter custom text here, all entered text is appended to the command."),
-				build_info.custom_target, &on_make_custom_input_response, NULL);
+			dialog = dialogs_show_input_persistent(NULL, GTK_WINDOW(main_widgets.window),
+				str, build_info.custom_target, &on_make_custom_input_response, NULL);
 		}
 		else
 		{
+			gtk_label_set_label(GTK_LABEL(ui_lookup_widget(dialog, "label")), str);
 			gtk_widget_show(dialog);
 		}
+		SETPTR(str, utils_str_remove_chars(g_strdup(bc->label), "_"));
+		gtk_window_set_title(GTK_WINDOW(dialog), str);
+		g_free(str);
 		return;
 	}
 	else if (grp == GEANY_GBG_EXEC)

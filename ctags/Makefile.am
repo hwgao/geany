@@ -11,6 +11,9 @@ AM_CFLAGS = \
 noinst_LTLIBRARIES = libctags.la
 
 parsers = \
+	optlib/forth.c \
+	optlib/meson.c \
+	optlib/scss.c \
 	parsers/cxx/cxx.c \
 	parsers/cxx/cxx_debug.c \
 	parsers/cxx/cxx_debug.h \
@@ -23,6 +26,7 @@ parsers = \
 	parsers/cxx/cxx_parser.h \
 	parsers/cxx/cxx_parser_internal.h \
 	parsers/cxx/cxx_parser_lambda.c \
+	parsers/cxx/cxx_parser_module.c \
 	parsers/cxx/cxx_parser_namespace.c \
 	parsers/cxx/cxx_parser_template.c \
 	parsers/cxx/cxx_parser_tokenizer.c \
@@ -32,6 +36,8 @@ parsers = \
 	parsers/cxx/cxx_qtmoc.c \
 	parsers/cxx/cxx_scope.c \
 	parsers/cxx/cxx_scope.h \
+	parsers/cxx/cxx_side_chain.c \
+	parsers/cxx/cxx_side_chain.h \
 	parsers/cxx/cxx_subparser.c \
 	parsers/cxx/cxx_subparser.h \
 	parsers/cxx/cxx_subparser_internal.h \
@@ -51,6 +57,7 @@ parsers = \
 	parsers/autoit.c \
 	parsers/basic.c \
 	parsers/bibtex.c \
+	parsers/bibtex.h \
 	parsers/geany_c.c \
 	parsers/clojure.c \
 	parsers/cobol.c \
@@ -69,19 +76,22 @@ parsers = \
 	parsers/haxe.c \
 	parsers/html.c \
 	parsers/jscript.c \
+	parsers/jscript.h \
 	parsers/json.c \
 	parsers/julia.c \
 	parsers/geany_lcpp.c \
 	parsers/geany_lcpp.h \
+	parsers/ldscript.c \
 	parsers/lisp.c \
 	parsers/lua.c \
 	parsers/make.c \
 	parsers/make.h \
 	parsers/markdown.c \
 	parsers/markdown.h \
-	parsers/geany_matlab.c \
+	parsers/matlab.c \
 	parsers/nsis.c \
 	parsers/objc.c \
+	parsers/ocaml.c \
 	parsers/pascal.c \
 	parsers/perl.c \
 	parsers/perl.h \
@@ -90,10 +100,13 @@ parsers = \
 	parsers/python.c \
 	parsers/r.c \
 	parsers/r.h \
+	parsers/raku.c \
 	parsers/rst.c \
 	parsers/ruby.c \
+	parsers/ruby.h \
 	parsers/rust.c \
 	parsers/sh.c \
+	parsers/sh.h \
 	parsers/sql.c \
 	parsers/tcl.c \
 	parsers/tcl.h \
@@ -146,6 +159,7 @@ libctags_la_SOURCES = \
 	main/htable.h \
 	main/inline.h \
 	main/interactive_p.h \
+	main/interval_tree_generic.h \
 	main/keyword.c \
 	main/keyword.h \
 	main/keyword_p.h \
@@ -193,6 +207,7 @@ libctags_la_SOURCES = \
 	main/ptrarray.h \
 	main/rbtree.c \
 	main/rbtree.h \
+	main/rbtree_augmented.h \
 	main/read.c \
 	main/read.h \
 	main/read_p.h \
@@ -224,6 +239,8 @@ libctags_la_SOURCES = \
 	main/types.h \
 	main/unwindi.c \
 	main/unwindi.h \
+	main/utf8_str.c \
+	main/utf8_str.h \
 	main/vstring.c \
 	main/vstring.h \
 	main/writer-ctags.c \
