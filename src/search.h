@@ -61,6 +61,8 @@ typedef struct GeanySearchPrefs
 	gboolean	hide_find_dialog;		/* hide the find dialog on next or previous */
 	gboolean	replace_and_find_by_default;	/* enter in replace window performs Replace & Find instead of Replace */
 	GeanyFindSelOptions find_selection_type;
+	gboolean	skip_confirmation_for_replace_in_session;	/* do *not* ask for confirmation
+															   before using "replace in session */
 }
 GeanySearchPrefs;
 
@@ -117,6 +119,8 @@ void search_show_find_dialog(void);
 void search_show_replace_dialog(void);
 
 void search_show_find_in_files_dialog_full(const gchar *text, const gchar *dir);
+
+gboolean search_show_wrap_dialog(const gchar *search_text);
 
 void geany_match_info_free(GeanyMatchInfo *info);
 

@@ -73,6 +73,14 @@
 	LispParser, \
 	TypeScriptParser, \
 	DosBatchParser, \
-	AutoItParser
+	AutoItParser, \
+	Perl6Parser, \
+	OcamlParser, \
+	LdScriptParser, \
+	ForthParser, \
+	MesonParser, \
+	SystemVerilogParser, \
+	SCSSParser, \
+	TerraformParser
 
 #endif

@@ -208,9 +208,12 @@ gboolean utils_is_opening_brace(gchar c, gboolean include_angles)
  * If the file doesn't exist, it will be created.
  * If it already exists, it will be overwritten.
  *
- * @warning You should use @c g_file_set_contents() instead if you don't need
- * file permissions and other metadata to be preserved, as that always handles
- * disk exhaustion safely.
+ * @warning Currently, this function uses g_file_replace_contents() to save
+ * files which offers a reasonable balence between data safety during save
+ * and other factors such as handling symlinks, remote files, or platform-
+ * dependent aspects. However, plugins with special requirements should
+ * not rely on the exact implementation of this function and should rather
+ * implement file saving by themselves.
  *
  * @param filename The filename of the file to write, in locale encoding.
  * @param text The text to write into the file.
@@ -221,55 +224,29 @@ gboolean utils_is_opening_brace(gchar c, gboolean include_angles)
 GEANY_API_SYMBOL
 gint utils_write_file(const gchar *filename, const gchar *text)
 {
+	GError *error = NULL;
+	gboolean success;
+	GFile *fp;
+
 	g_return_val_if_fail(filename != NULL, ENOENT);
 	g_return_val_if_fail(text != NULL, EINVAL);
 
-	if (file_prefs.use_safe_file_saving)
+	fp = g_file_new_for_path(filename);
+
+	success = g_file_replace_contents(fp, text, strlen(text), NULL, FALSE,
+		G_FILE_CREATE_NONE, NULL, NULL, &error);
+
+	g_object_unref(fp);
+
+	if (error)
 	{
-		GError *error = NULL;
-		if (! g_file_set_contents(filename, text, -1, &error))
-		{
-			geany_debug("%s: could not write to file %s (%s)", G_STRFUNC, filename, error->message);
-			g_error_free(error);
-			return EIO;
-		}
+		geany_debug("%s: could not write to file %s (%s)", G_STRFUNC, filename, error->message);
+		g_error_free(error);
 	}
-	else
-	{
-		FILE *fp;
-		gsize bytes_written, len;
-		gboolean fail = FALSE;
+	else if (!success)
+		geany_debug("%s: could not write to file %s", G_STRFUNC, filename);
 
-		if (filename == NULL)
-			return ENOENT;
-
-		len = strlen(text);
-		errno = 0;
-		fp = g_fopen(filename, "w");
-		if (fp == NULL)
-			fail = TRUE;
-		else
-		{
-			bytes_written = fwrite(text, sizeof(gchar), len, fp);
-
-			if (len != bytes_written)
-			{
-				fail = TRUE;
-				geany_debug(
-					"utils_write_file(): written only %"G_GSIZE_FORMAT" bytes, had to write %"G_GSIZE_FORMAT" bytes to %s",
-					bytes_written, len, filename);
-			}
-			if (fclose(fp) != 0)
-				fail = TRUE;
-		}
-		if (fail)
-		{
-			geany_debug("utils_write_file(): could not write to file %s (%s)",
-				filename, g_strerror(errno));
-			return FALLBACK(errno, EIO);
-		}
-	}
-	return 0;
+	return success ? 0 : EIO;
 }
 
 
@@ -495,6 +472,54 @@ gchar *utils_utf8_strdown(const gchar *str)
 	}
 
 	return down;
+}
+
+
+/* Returns @c TRUE if @a key is a substring of @a haystack, case-insensitive.
+ * Applies @c g_utf8_normalize and @c g_utf8_casefold on both input strings before comparison.
+ */
+gboolean utils_utf8_substring_match(const gchar *key, const gchar *haystack)
+{
+	gchar *normalized_string = NULL;
+	gchar *normalized_key = NULL;
+	gchar *case_normalized_string = NULL;
+	gchar *case_normalized_key = NULL;
+	gboolean matched = TRUE;
+
+	g_return_val_if_fail(key != NULL, FALSE);
+	g_return_val_if_fail(haystack != NULL, FALSE);
+
+	normalized_string = g_utf8_normalize(haystack, -1, G_NORMALIZE_ALL);
+	normalized_key = g_utf8_normalize(key, -1, G_NORMALIZE_ALL);
+
+	if (normalized_string != NULL && normalized_key != NULL)
+	{
+		GString *stripped_key;
+		gchar **subkey, **subkeys;
+
+		case_normalized_string = g_utf8_casefold(normalized_string, -1);
+		case_normalized_key = g_utf8_casefold(normalized_key, -1);
+		stripped_key = g_string_new(case_normalized_key);
+		do {} while (utils_string_replace_all(stripped_key, "  ", " "));
+		subkeys = g_strsplit(stripped_key->str, " ", -1);
+		g_string_free(stripped_key, TRUE);
+		foreach_strv(subkey, subkeys)
+		{
+			if (strstr(case_normalized_string, *subkey) == NULL)
+			{
+				matched = FALSE;
+				break;
+			}
+		}
+		g_strfreev(subkeys);
+	}
+
+	g_free(normalized_key);
+	g_free(normalized_string);
+	g_free(case_normalized_key);
+	g_free(case_normalized_string);
+
+	return matched;
 }
 
 
@@ -766,21 +791,37 @@ gchar *utils_get_date_time(const gchar *format, time_t *time_to_use)
 }
 
 
+/* Extracts initials from @p name, with basic Unicode support */
+GEANY_EXPORT_SYMBOL
 gchar *utils_get_initials(const gchar *name)
 {
-	gint i = 1, j = 1;
-	gchar *initials = g_malloc0(5);
+	GString *initials;
+	gchar *composed;
+	gboolean at_bound = TRUE;
 
-	initials[0] = name[0];
-	while (name[i] != '\0' && j < 4)
+	g_return_val_if_fail(name != NULL, NULL);
+
+	composed = g_utf8_normalize(name, -1, G_NORMALIZE_ALL_COMPOSE);
+	g_return_val_if_fail(composed != NULL, NULL);
+
+	initials = g_string_new(NULL);
+	for (const gchar *p = composed; *p; p = g_utf8_next_char(p))
 	{
-		if (name[i] == ' ' && name[i + 1] != ' ')
+		gunichar ch = g_utf8_get_char(p);
+
+		if (g_unichar_isspace(ch))
+			at_bound = TRUE;
+		else if (at_bound)
 		{
-			initials[j++] = name[i + 1];
+			const gchar *end = g_utf8_next_char(p);
+			g_string_append_len(initials, p, end - p);
+			at_bound = FALSE;
 		}
-		i++;
 	}
-	return initials;
+
+	g_free(composed);
+
+	return g_string_free(initials, FALSE);
 }
 
 

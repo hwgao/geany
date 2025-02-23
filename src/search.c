@@ -44,12 +44,12 @@
 #include "toolbar.h"
 #include "ui_utils.h"
 #include "utils.h"
+#include "win32.h"
 
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
 
-#include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 
 enum
@@ -437,7 +437,7 @@ void search_find_selection(GeanyDocument *doc, gboolean search_backwards)
 	{
 		setup_find_next(s);	/* allow find next/prev */
 
-		if (document_find_text(doc, s, NULL, 0, search_backwards, NULL, FALSE, NULL) > -1)
+		if (document_find_text(doc, s, NULL, 0, search_backwards, NULL, FALSE) > -1)
 			editor_display_current_line(doc->editor, 0.3F);
 		g_free(s);
 	}
@@ -548,6 +548,10 @@ static void create_find_dialog(void)
 		GTK_BUTTON_BOX(bbox));
 	gtk_container_add(GTK_CONTAINER(exp), bbox);
 	gtk_container_add(GTK_CONTAINER(vbox), exp);
+
+#ifdef G_OS_WIN32
+	win32_update_titlebar_theme(find_dlg.dialog);
+#endif
 }
 
 
@@ -732,6 +736,10 @@ static void create_replace_dialog(void)
 		GTK_BUTTON_BOX(bbox));
 	gtk_container_add(GTK_CONTAINER(exp), bbox);
 	gtk_container_add(GTK_CONTAINER(vbox), exp);
+
+#ifdef G_OS_WIN32
+		win32_update_titlebar_theme(replace_dlg.dialog);
+#endif
 }
 
 
@@ -1030,6 +1038,10 @@ static void create_fif_dialog(void)
 			G_CALLBACK(on_find_in_files_dialog_response), NULL);
 	g_signal_connect(fif_dlg.dialog, "delete-event",
 			G_CALLBACK(gtk_widget_hide_on_delete), NULL);
+
+#ifdef G_OS_WIN32
+		win32_update_titlebar_theme(fif_dlg.dialog);
+#endif
 }
 
 
@@ -1123,6 +1135,8 @@ void search_show_find_in_files_dialog_full(const gchar *text, const gchar *dir)
 		g_free(cur_dir);
 	}
 
+	ui_set_search_entry_background(fif_dlg.search_combo, TRUE);
+	ui_set_search_entry_background(fif_dlg.dir_combo, TRUE);
 	update_fif_file_mode_combo();
 	update_file_patterns(fif_dlg.files_mode_combo, fif_dlg.files_combo);
 
@@ -1143,6 +1157,51 @@ void search_show_find_in_files_dialog_full(const gchar *text, const gchar *dir)
 	gtk_widget_show(fif_dlg.dialog);
 	/* bring the dialog back in the foreground in case it is already open but the focus is away */
 	gtk_window_present(GTK_WINDOW(fif_dlg.dialog));
+}
+
+
+/* like dialogs_show_question_full() but makes the non-cancel button default */
+gboolean search_show_wrap_dialog(const gchar *search_text)
+{
+	gboolean ret;
+	GtkWidget *dialog;
+	GtkWidget *btn;
+	GtkWidget *visible_dialog = NULL;
+	gchar *question_text;
+
+	if (find_dlg.dialog && gtk_widget_is_visible(find_dlg.dialog))
+		visible_dialog = find_dlg.dialog;
+	else if (replace_dlg.dialog && gtk_widget_is_visible(replace_dlg.dialog))
+		visible_dialog = replace_dlg.dialog;
+
+	if (visible_dialog)
+		gtk_widget_hide(visible_dialog);
+
+	question_text = g_strdup_printf(_("\"%s\" was not found."), search_text);
+
+	dialog = gtk_message_dialog_new(GTK_WINDOW(main_widgets.window),
+		GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_QUESTION,
+		GTK_BUTTONS_NONE, "%s", question_text);
+	gtk_widget_set_name(dialog, "GeanyDialog");
+	gtk_window_set_title(GTK_WINDOW(dialog), _("Question"));
+	gtk_window_set_icon_name(GTK_WINDOW(dialog), "geany");
+
+	gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog),
+		"%s", _("Wrap search and find again?"));
+
+	gtk_dialog_add_button(GTK_DIALOG(dialog), GTK_STOCK_CANCEL, GTK_RESPONSE_NO);
+	btn = gtk_dialog_add_button(GTK_DIALOG(dialog), GTK_STOCK_FIND, GTK_RESPONSE_YES);
+	gtk_widget_grab_default(btn);
+
+	ret = gtk_dialog_run(GTK_DIALOG(dialog));
+
+	gtk_widget_destroy(dialog);
+	g_free(question_text);
+
+	if (visible_dialog && ret == GTK_RESPONSE_YES)
+		gtk_widget_show(visible_dialog);
+
+	return ret == GTK_RESPONSE_YES;
 }
 
 
@@ -1353,7 +1412,7 @@ on_find_dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 			case GEANY_RESPONSE_FIND_PREVIOUS:
 			{
 				gint result = document_find_text(doc, search_data.text, search_data.original_text, search_data.flags,
-					(response == GEANY_RESPONSE_FIND_PREVIOUS), NULL, TRUE, GTK_WIDGET(find_dlg.dialog));
+					(response == GEANY_RESPONSE_FIND_PREVIOUS), NULL, TRUE);
 				ui_set_search_entry_background(find_dlg.entry, (result > -1));
 				check_close = search_prefs.hide_find_dialog;
 				break;
@@ -1460,7 +1519,8 @@ on_replace_dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 	}
 
 	if (response == GEANY_RESPONSE_REPLACE_IN_SESSION) {
-		if (! dialogs_show_question_full(replace_dlg.dialog, NULL, NULL,
+		if (!search_prefs.skip_confirmation_for_replace_in_session &&
+			! dialogs_show_question_full(replace_dlg.dialog, NULL, NULL,
 			_("This operation will modify all open files which contain the text to replace."),
 			_("Are you sure to replace in the whole session?"))) {
 			return;
@@ -1510,7 +1570,7 @@ on_replace_dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 				search_backwards_re);
 			if (rep != -1)
 				document_find_text(doc, find, original_find, search_flags_re, search_backwards_re,
-					NULL, TRUE, NULL);
+					NULL, TRUE);
 			break;
 		}
 		case GEANY_RESPONSE_REPLACE:
@@ -1521,7 +1581,7 @@ on_replace_dialog_response(GtkDialog *dialog, gint response, gpointer user_data)
 		case GEANY_RESPONSE_FIND:
 		{
 			gint result = document_find_text(doc, find, original_find, search_flags_re,
-								search_backwards_re, NULL, TRUE, GTK_WIDGET(dialog));
+								search_backwards_re, NULL, TRUE);
 			ui_set_search_entry_background(replace_dlg.find_entry, (result > -1));
 			break;
 		}
@@ -1559,6 +1619,15 @@ fail:
 	g_free(replace);
 	g_free(original_find);
 	g_free(original_replace);
+}
+
+
+static void reset_msgwin(void)
+{
+	gtk_notebook_set_current_page(GTK_NOTEBOOK(msgwindow.notebook), MSG_MESSAGE);
+	gtk_list_store_clear(msgwindow.store_msg);
+	// reset width after any long messages
+	gtk_tree_view_columns_autosize(GTK_TREE_VIEW(msgwindow.tree_msg));
 }
 
 
@@ -1623,12 +1692,21 @@ on_find_in_files_dialog_response(GtkDialog *dialog, gint response,
 		GtkWidget *dir_combo = fif_dlg.dir_combo;
 		const gchar *utf8_dir =
 			gtk_entry_get_text(GTK_ENTRY(gtk_bin_get_child(GTK_BIN(dir_combo))));
+		gchar *locale_dir = utils_get_locale_from_utf8(utf8_dir);
 		GeanyEncodingIndex enc_idx =
 			ui_encodings_combo_box_get_active_encoding(GTK_COMBO_BOX(fif_dlg.encoding_combo));
 
-		if (G_UNLIKELY(EMPTY(utf8_dir)))
-			ui_set_statusbar(FALSE, _("Invalid directory for find in files."));
-		else if (!EMPTY(search_text))
+		if (!g_file_test(locale_dir, G_FILE_TEST_IS_DIR))
+		{
+			ui_set_statusbar(FALSE, _("Invalid directory for Find in Files."));
+			ui_set_search_entry_background(dir_combo, FALSE);
+		}
+		else if (EMPTY(search_text))
+		{
+			ui_set_statusbar(FALSE, _("No text to find."));
+			ui_set_search_entry_background(search_combo, FALSE);
+		}
+		else
 		{
 			GString *opts = get_grep_options();
 			const gchar *enc = (enc_idx == GEANY_ENCODING_UTF_8) ? NULL :
@@ -1643,8 +1721,7 @@ on_find_in_files_dialog_response(GtkDialog *dialog, gint response,
 			}
 			g_string_free(opts, TRUE);
 		}
-		else
-			ui_set_statusbar(FALSE, _("No text to find."));
+		g_free(locale_dir);
 	}
 	else
 		gtk_widget_hide(fif_dlg.dialog);
@@ -1708,9 +1785,7 @@ search_find_in_files(const gchar *utf8_search_text, const gchar *utf8_dir, const
 			return FALSE;
 		}
 	}
-
-	gtk_list_store_clear(msgwindow.store_msg);
-	gtk_notebook_set_current_page(GTK_NOTEBOOK(msgwindow.notebook), MSG_MESSAGE);
+	reset_msgwin();
 
 	/* we can pass 'enc' without strdup'ing it here because it's a global const string and
 	 * always exits longer than the lifetime of this function */
@@ -2214,9 +2289,7 @@ void search_find_usage(const gchar *search_text, const gchar *original_search_te
 		utils_beep();
 		return;
 	}
-
-	gtk_notebook_set_current_page(GTK_NOTEBOOK(msgwindow.notebook), MSG_MESSAGE);
-	gtk_list_store_clear(msgwindow.store_msg);
+	reset_msgwin();
 
 	if (! in_session)
 	{	/* use current document */
@@ -2303,7 +2376,7 @@ void search_find_again(gboolean change_direction)
 	{
 		gboolean forward = ! search_data.backwards;
 		gint result = document_find_text(doc, search_data.text, search_data.original_text, search_data.flags,
-			change_direction ? forward : !forward, NULL, FALSE, NULL);
+			change_direction ? forward : !forward, NULL, FALSE);
 
 		if (result > -1)
 			editor_display_current_line(doc->editor, 0.3F);

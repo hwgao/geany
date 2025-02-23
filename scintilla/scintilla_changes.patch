@@ -62,7 +62,7 @@ diff --git scintilla/lexilla/src/Lexilla.cxx scintilla/lexilla/src/Lexilla.cxx
 index cd4b23617..af4a73db4 100644
 --- scintilla/lexilla/src/Lexilla.cxx
 +++ scintilla/lexilla/src/Lexilla.cxx
-@@ -167,8 +167,68 @@
+@@ -167,8 +167,76 @@
  
  CatalogueModules catalogueLexilla;
  
@@ -77,12 +77,14 @@ index cd4b23617..af4a73db4 100644
 +		&lmBash,
 +		&lmBatch,
 +		&lmCaml,
++		&lmCIL,
 +		&lmCmake,
 +		&lmCOBOL,
 +		&lmCoffeeScript,
 +		&lmCPP,
 +		&lmCss,
 +		&lmD,
++		&lmDart,
 +		&lmDiff,
 +		&lmErlang,
 +		&lmF77,
@@ -98,6 +100,8 @@ index cd4b23617..af4a73db4 100644
 +		&lmLua,
 +		&lmMake,
 +		&lmMarkdown,
++		&lmNim,
++		&lmNix,
 +		&lmNsis,
 +		&lmNull,
 +		&lmOctave,
@@ -109,16 +113,20 @@ index cd4b23617..af4a73db4 100644
 +		&lmProps,
 +		&lmPython,
 +		&lmR,
++		&lmRaku,
 +		&lmRuby,
 +		&lmRust,
 +		&lmSmalltalk,
 +		&lmSQL,
 +		&lmTCL,
++		&lmTOML,
 +		&lmTxt2tags,
 +		&lmVerilog,
 +		&lmVHDL,
++		&lmVisualProlog,
 +		&lmXML,
 +		&lmYAML,
++		&lmZig,
 +	});
 +}
 +

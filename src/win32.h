@@ -30,14 +30,8 @@
 
 G_BEGIN_DECLS
 
-gchar *win32_show_file_dialog(GtkWindow *parent, const gchar *title, const gchar *initial_dir);
-
-gboolean win32_message_dialog(GtkWidget *parent, GtkMessageType type, const gchar *msg);
-
 void win32_open_browser(const gchar *uri);
 
-
-gchar *win32_show_folder_dialog(GtkWidget *parent, const gchar *title, const gchar *initial_dir);
 
 gint win32_check_write_permission(const gchar *dir);
 
@@ -52,6 +46,8 @@ gchar *win32_get_installation_dir(void);
 gchar *win32_expand_environment_variables(const gchar *str);
 
 gchar *win32_get_user_config_dir(void);
+
+void win32_update_titlebar_theme(GtkWidget *window);
 
 G_END_DECLS
 

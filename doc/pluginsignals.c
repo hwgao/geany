@@ -92,6 +92,17 @@ signal void (*document_reload)(GObject *obj, GeanyDocument *doc, gpointer user_d
  */
 signal void (*document_before_save)(GObject *obj, GeanyDocument *doc, gpointer user_data);
 
+/** Sent before save as is performed with the original document.
+ *
+ * @param obj a GeanyObject instance, should be ignored.
+ * @param doc the original document. The document with the new file name is still
+ *        reported by the "document-save" signal sent afterwards.
+ * @param user_data user data.
+ *
+ * @since 2.1
+ */
+signal void (*document_before_save_as)(GObject *obj, GeanyDocument *doc, gpointer user_data);
+
 /** Sent when a new document is saved.
  *
  * @param obj a GeanyObject instance, should be ignored.
@@ -209,6 +220,18 @@ signal void (*project_dialog_close)(GObject *obj, GtkWidget *notebook, gpointer 
  * @param user_data user data.
  */
 signal void (*geany_startup_complete)(GObject *obj, gpointer user_data);
+
+/** Sent immediately after Geany is informed about user action leading to the Geany
+ *  process termination. This signal is emitted before any actual tasks that happen
+ *  during Geany shutdown such as project or file closing, plugin unload, widget
+ *  destruction, etc.
+ *
+ * @param obj a GeanyObject instance, should be ignored.
+ * @param user_data user data.
+ *
+ * @since 2.1
+ */
+signal void (*geany_before_quit)(GObject *obj, gpointer user_data);
 
 /** Sent before build is started. A plugin could use this signal e.g. to save all unsaved documents
  *  before the build starts.
